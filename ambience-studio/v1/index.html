@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ambience Studio — forgott3n.VM</title>
+<style>
+  :root {
+    --void: #02040a;
+    --deep: #050b18;
+    --panel: rgba(8, 16, 32, 0.45);
+    --glass: rgba(12, 22, 45, 0.35);
+    --border: rgba(120, 180, 255, 0.12);
+    --border-strong: rgba(160, 210, 255, 0.25);
+    --blue: #4a9eff;
+    --cyan: #7ef0ff;
+    --ghost: #e8f4ff;
+    --muted: #5a7a9a;
+    --glow: 0 0 20px rgba(126, 240, 255, 0.15);
+    --glow-strong: 0 0 30px rgba(126, 240, 255, 0.35);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--void);
+    color: var(--ghost);
+    font: 12.5px/1.45 "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+  }
+
+  /* Particle canvas */
+  #particles {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  #app {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 100%;
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+
+  /* Glass utility */
+  .glass {
+    background: var(--glass);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid var(--border);
+    box-shadow: var(--glow), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(4, 10, 22, 0.6);
+    backdrop-filter: blur(20px);
+  }
+
+  .logo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .logo h1 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.28em;
+    color: var(--ghost);
+    text-shadow: 0 0 18px rgba(126,240,255,0.4);
+  }
+  .logo span {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+  }
+
+  .master-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .master-controls label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    background: rgba(80,120,180,0.25);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 11px; height: 11px;
+    background: var(--cyan);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(126,240,255,0.6);
+  }
+
+  button {
+    background: rgba(20, 40, 80, 0.4);
+    color: var(--ghost);
+    border: 1px solid var(--border);
+    padding: 7px 14px;
+    font: 11px inherit;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.18s;
+    backdrop-filter: blur(8px);
+  }
+  button:hover {
+    background: rgba(60, 120, 220, 0.25);
+    border-color: var(--border-strong);
+    box-shadow: var(--glow);
+  }
+  button.active {
+    background: rgba(80, 160, 255, 0.3);
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: var(--glow-strong);
+  }
+  button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Main */
+  main {
+    display: grid;
+    grid-template-columns: 260px 1fr 280px;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  /* Side panels */
+  .side {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    background: rgba(4, 10, 22, 0.5);
+    backdrop-filter: blur(16px);
+    overflow: hidden;
+  }
+  .side.right { border-right: none; border-left: 1px solid var(--border); }
+
+  .section-title {
+    padding: 12px 16px 6px;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .preset-list, .track-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 0 10px 12px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .preset-list button, .track-list button {
+    text-align: left;
+    padding: 8px 11px;
+    font-size: 11px;
+    border-radius: 5px;
+  }
+
+  #viz {
+    height: 140px;
+    background: rgba(0,0,0,0.4);
+    border-top: 1px solid var(--border);
+  }
+
+  .status-bar {
+    padding: 8px 14px;
+    font-size: 10px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+  }
+
+  /* Layers area */
+  .layers-wrap {
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .layer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+  }
+
+  .layer {
+    background: var(--panel);
+    backdrop-filter: blur(18px);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .layer:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--glow);
+  }
+  .layer.muted { opacity: 0.4; }
+
+  .layer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .layer-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--cyan);
+    letter-spacing: 0.04em;
+  }
+  .mute-btn {
+    width: 26px;
+    height: 20px;
+    padding: 0;
+    font-size: 10px;
+    border-radius: 4px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ctrl-row label {
+    width: 48px;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+  .ctrl-row input[type=range] { flex: 1; }
+
+  /* Extra toggles panel */
+  .toggles-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 6px;
+    padding: 8px 0;
+  }
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 9px;
+    background: rgba(10,20,40,0.4);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .toggle:hover { border-color: var(--border-strong); }
+  .toggle.on {
+    background: rgba(50,120,220,0.2);
+    border-color: rgba(126,240,255,0.35);
+    color: var(--cyan);
+  }
+  .toggle .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .toggle.on .dot {
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+  }
+
+  /* Footer */
+  footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 20px;
+    border-top: 1px solid var(--border);
+    background: rgba(4, 10, 22, 0.7);
+    backdrop-filter: blur(12px);
+    font-size: 10px;
+    color: var(--muted);
+  }
+  footer .credit {
+    letter-spacing: 0.08em;
+  }
+  footer .credit strong {
+    color: var(--cyan);
+    font-weight: 500;
+  }
+  .keys span {
+    display: inline-block;
+    border: 1px solid rgba(80,120,180,0.3);
+    padding: 1px 5px;
+    margin: 0 2px;
+    border-radius: 3px;
+    color: var(--ghost);
+    font-size: 9px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(80,140,220,0.25); border-radius: 3px; }
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+
+<div id="app">
+  <header>
+    <div class="logo">
+      <h1>AMBIENCE STUDIO</h1>
+      <span>forgott3n.VM · Xclounkit234X</span>
+    </div>
+    <div class="master-controls">
+      <label>Master</label>
+      <input type="range" id="masterVol" min="0" max="100" value="72" style="width:130px">
+      <button id="playBtn">▶ PLAY</button>
+      <button id="randBtn">RANDOMIZE</button>
+      <button id="saveBtn">SAVE TRACK</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left: Presets -->
+    <div class="side">
+      <div class="section-title">Presets</div>
+      <div class="preset-list" id="presetList"></div>
+      <canvas id="viz"></canvas>
+      <div class="status-bar" id="status">Ready — Space to play</div>
+    </div>
+
+    <!-- Center: Layers + Toggles -->
+    <div class="layers-wrap">
+      <div class="section-title" style="padding-left:2px">Layers</div>
+      <div class="layer-grid" id="layers"></div>
+
+      <div class="section-title" style="padding-left:2px;margin-top:8px">Global Toggles & Modulators</div>
+      <div class="toggles-panel" id="toggles"></div>
+    </div>
+
+    <!-- Right: Saved Tracks -->
+    <div class="side right">
+      <div class="section-title">Saved Tracks</div>
+      <div class="track-list" id="trackList">
+        <div style="padding:12px;color:var(--muted);font-size:11px">No saved tracks yet</div>
+      </div>
+      <div class="status-bar" style="font-size:9px">IndexedDB · Local only</div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="keys">
+      <span>Space</span> Play/Stop &nbsp;
+      <span>R</span> Randomize &nbsp;
+      <span>S</span> Save Track
+    </div>
+    <div class="credit">
+      Developed by <strong>Xclounkit234X</strong> · forgott3n.VM
+    </div>
+  </footer>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   AMBIENCE STUDIO — forgott3n.VM
+   Developer: Xclounkit234X
+══════════════════════════════════════════════════════════════ */
+
+const audio = {
+  ctx: null,
+  master: null,
+  analyser: null,
+  running: false,
+  layers: {},
+  toggles: {}
+};
+
+/* ───────────── Layer Definitions ───────────── */
+const LAYER_DEFS = [
+  { id: 'room',    name: 'Room Tone',       type: 'noise' },
+  { id: 'air',     name: 'Air / Wind',      type: 'noise' },
+  { id: 'deep',    name: 'Deep Drone',      type: 'drone' },
+  { id: 'mid',     name: 'Mid Drone',       type: 'drone' },
+  { id: 'high',    name: 'High Shimmer',    type: 'wash' },
+  { id: 'rain',    name: 'Rain',            type: 'rain' },
+  { id: 'thunder', name: 'Distant Thunder', type: 'thunder' },
+  { id: 'breath',  name: 'Breathing Pulse', type: 'breath' },
+  { id: 'sub',     name: 'Sub Rumble',      type: 'drone' },
+  { id: 'pad',     name: 'Soft Pad',        type: 'wash' },
+  { id: 'crackles',name: 'Ember Crackles',  type: 'noise' },
+  { id: 'windgust',name: 'Wind Gusts',      type: 'noise' },
+];
+
+/* ───────────── Global Toggles (~40) ───────────── */
+const TOGGLE_DEFS = [
+  { id: 'stereoWiden',   label: 'Stereo Widen' },
+  { id: 'softClip',      label: 'Soft Clip' },
+  { id: 'slowEvolve',    label: 'Slow Evolve' },
+  { id: 'deepFilter',    label: 'Deep Filter' },
+  { id: 'highAir',       label: 'High Air' },
+  { id: 'pulseSync',     label: 'Pulse Sync' },
+  { id: 'reverbTail',    label: 'Long Reverb Tail' },
+  { id: 'lowCut',        label: 'Global Low Cut' },
+  { id: 'highShelf',     label: 'High Shelf Glow' },
+  { id: 'motionLFO',     label: 'Motion LFO' },
+  { id: 'chaosMode',     label: 'Chaos Mode' },
+  { id: 'freezePads',    label: 'Freeze Pads' },
+  { id: 'rainDense',     label: 'Dense Rain' },
+  { id: 'thunderFreq',   label: 'Frequent Thunder' },
+  { id: 'subBoost',      label: 'Sub Boost' },
+  { id: 'droneDetune',   label: 'Drone Detune' },
+  { id: 'shimmerBright', label: 'Bright Shimmer' },
+  { id: 'roomDark',      label: 'Darker Room' },
+  { id: 'windHowl',      label: 'Wind Howl' },
+  { id: 'emberGlow',     label: 'Ember Glow' },
+  { id: 'cosmicDrift',   label: 'Cosmic Drift' },
+  { id: 'heartbeat',     label: 'Heartbeat Mode' },
+  { id: 'voidHiss',      label: 'Void Hiss' },
+  { id: 'glassResonance',label: 'Glass Resonance' },
+  { id: 'nebulaWash',    label: 'Nebula Wash' },
+  { id: 'signalBleed',   label: 'Signal Bleed' },
+  { id: 'timeStretch',   label: 'Time Stretch' },
+  { id: 'phaseShift',    label: 'Phase Shift' },
+  { id: 'granular',      label: 'Granular Texture' },
+  { id: 'analogWarm',    label: 'Analog Warmth' },
+  { id: 'digitalRain',   label: 'Digital Rain' },
+  { id: 'solarWind',     label: 'Solar Wind' },
+  { id: 'blackHole',     label: 'Black Hole Pull' },
+  { id: 'stardust',      label: 'Stardust' },
+  { id: 'ionStorm',      label: 'Ion Storm' },
+  { id: 'quantumFoam',   label: 'Quantum Foam' },
+  { id: 'eventHorizon',  label: 'Event Horizon' },
+  { id: 'pulsar',        label: 'Pulsar Beat' },
+  { id: 'darkMatter',    label: 'Dark Matter' },
+  { id: 'ghostEcho',     label: 'Ghost Echo' },
+  { id: 'moltenCore',    label: 'Molten Core' },
+  { id: 'silentScream',  label: 'Silent Scream' },
+];
+
+/* ───────────── 40+ Presets ───────────── */
+const PRESETS = {
+  'Deep Space':          { room:0.30, air:0.08, deep:0.55, mid:0.22, high:0.18, rain:0.00, thunder:0.00, breath:0.10, sub:0.40, pad:0.25, crackles:0.00, windgust:0.05 },
+  'Rainy Forest':        { room:0.12, air:0.22, deep:0.08, mid:0.06, high:0.10, rain:0.72, thunder:0.12, breath:0.04, sub:0.05, pad:0.08, crackles:0.00, windgust:0.15 },
+  'Server Room':         { room:0.42, air:0.35, deep:0.28, mid:0.38, high:0.20, rain:0.00, thunder:0.00, breath:0.00, sub:0.25, pad:0.15, crackles:0.05, windgust:0.00 },
+  'Cyberpunk Alley':     { room:0.28, air:0.38, deep:0.42, mid:0.32, high:0.38, rain:0.22, thunder:0.06, breath:0.08, sub:0.30, pad:0.20, crackles:0.10, windgust:0.12 },
+  'Meditation':          { room:0.18, air:0.08, deep:0.38, mid:0.28, high:0.22, rain:0.04, thunder:0.00, breath:0.32, sub:0.20, pad:0.35, crackles:0.00, windgust:0.00 },
+  'Storm':               { room:0.22, air:0.52, deep:0.18, mid:0.12, high:0.08, rain:0.85, thunder:0.55, breath:0.00, sub:0.25, pad:0.05, crackles:0.00, windgust:0.40 },
+  'Night Train':         { room:0.38, air:0.18, deep:0.48, mid:0.18, high:0.06, rain:0.08, thunder:0.00, breath:0.06, sub:0.35, pad:0.10, crackles:0.00, windgust:0.20 },
+  'Abandoned Station':   { room:0.45, air:0.25, deep:0.35, mid:0.20, high:0.12, rain:0.05, thunder:0.00, breath:0.00, sub:0.30, pad:0.15, crackles:0.08, windgust:0.10 },
+  'Underwater Cave':     { room:0.25, air:0.05, deep:0.50, mid:0.30, high:0.08, rain:0.00, thunder:0.00, breath:0.15, sub:0.45, pad:0.30, crackles:0.00, windgust:0.00 },
+  'Neon Cathedral':      { room:0.20, air:0.15, deep:0.40, mid:0.35, high:0.45, rain:0.00, thunder:0.00, breath:0.10, sub:0.25, pad:0.40, crackles:0.00, windgust:0.00 },
+  'Frozen Tundra':       { room:0.15, air:0.45, deep:0.20, mid:0.10, high:0.15, rain:0.00, thunder:0.00, breath:0.00, sub:0.15, pad:0.10, crackles:0.00, windgust:0.55 },
+  'Volcanic Edge':       { room:0.30, air:0.20, deep:0.35, mid:0.15, high:0.10, rain:0.00, thunder:0.20, breath:0.00, sub:0.40, pad:0.08, crackles:0.45, windgust:0.15 },
+  'Orbital Drift':       { room:0.22, air:0.12, deep:0.48, mid:0.25, high:0.28, rain:0.00, thunder:0.00, breath:0.08, sub:0.35, pad:0.30, crackles:0.00, windgust:0.00 },
+  'Ghost Frequency':     { room:0.18, air:0.10, deep:0.30, mid:0.22, high:0.35, rain:0.00, thunder:0.00, breath:0.18, sub:0.20, pad:0.25, crackles:0.00, windgust:0.00 },
+  'Data Center Night':   { room:0.40, air:0.30, deep:0.25, mid:0.40, high:0.18, rain:0.00, thunder:0.00, breath:0.00, sub:0.22, pad:0.12, crackles:0.06, windgust:0.00 },
+  'Endless Rain':        { room:0.10, air:0.15, deep:0.05, mid:0.04, high:0.08, rain:0.90, thunder:0.08, breath:0.00, sub:0.00, pad:0.05, crackles:0.00, windgust:0.10 },
+  'Black Hole Approach': { room:0.35, air:0.08, deep:0.60, mid:0.25, high:0.05, rain:0.00, thunder:0.00, breath:0.05, sub:0.55, pad:0.15, crackles:0.00, windgust:0.00 },
+  'Crystal Cave':        { room:0.20, air:0.10, deep:0.25, mid:0.30, high:0.40, rain:0.00, thunder:0.00, breath:0.12, sub:0.15, pad:0.35, crackles:0.00, windgust:0.00 },
+  'War Zone Aftermath':  { room:0.35, air:0.25, deep:0.20, mid:0.10, high:0.05, rain:0.15, thunder:0.10, breath:0.00, sub:0.30, pad:0.05, crackles:0.20, windgust:0.25 },
+  'Lucid Dream':         { room:0.15, air:0.12, deep:0.35, mid:0.30, high:0.30, rain:0.00, thunder:0.00, breath:0.25, sub:0.18, pad:0.40, crackles:0.00, windgust:0.00 },
+  'Subway Tunnel':       { room:0.50, air:0.20, deep:0.30, mid:0.15, high:0.05, rain:0.00, thunder:0.00, breath:0.00, sub:0.35, pad:0.08, crackles:0.05, windgust:0.15 },
+  'Solar Flare':         { room:0.20, air:0.30, deep:0.40, mid:0.25, high:0.35, rain:0.00, thunder:0.15, breath:0.00, sub:0.30, pad:0.20, crackles:0.10, windgust:0.20 },
+  'Ancient Temple':      { room:0.35, air:0.08, deep:0.40, mid:0.25, high:0.15, rain:0.00, thunder:0.00, breath:0.15, sub:0.25, pad:0.30, crackles:0.00, windgust:0.00 },
+  'Zero Gravity':        { room:0.10, air:0.05, deep:0.45, mid:0.30, high:0.25, rain:0.00, thunder:0.00, breath:0.10, sub:0.30, pad:0.35, crackles:0.00, windgust:0.00 },
+  'Industrial Fog':      { room:0.40, air:0.35, deep:0.25, mid:0.20, high:0.10, rain:0.10, thunder:0.00, breath:0.00, sub:0.30, pad:0.10, crackles:0.12, windgust:0.15 },
+  'Moon Base':           { room:0.25, air:0.05, deep:0.35, mid:0.28, high:0.20, rain:0.00, thunder:0.00, breath:0.05, sub:0.25, pad:0.22, crackles:0.00, windgust:0.00 },
+  'Haunted Frequency':   { room:0.22, air:0.12, deep:0.30, mid:0.18, high:0.28, rain:0.00, thunder:0.00, breath:0.20, sub:0.20, pad:0.18, crackles:0.00, windgust:0.00 },
+  'Deep Ocean':          { room:0.20, air:0.02, deep:0.55, mid:0.25, high:0.05, rain:0.00, thunder:0.00, breath:0.10, sub:0.50, pad:0.25, crackles:0.00, windgust:0.00 },
+  'City Sleeps':         { room:0.30, air:0.20, deep:0.25, mid:0.15, high:0.12, rain:0.20, thunder:0.00, breath:0.05, sub:0.20, pad:0.15, crackles:0.00, windgust:0.10 },
+  'Pulsar Core':         { room:0.15, air:0.10, deep:0.45, mid:0.30, high:0.25, rain:0.00, thunder:0.00, breath:0.30, sub:0.35, pad:0.20, crackles:0.00, windgust:0.00 },
+  'Forgotten Archive':   { room:0.38, air:0.15, deep:0.30, mid:0.22, high:0.15, rain:0.00, thunder:0.00, breath:0.00, sub:0.25, pad:0.18, crackles:0.08, windgust:0.00 },
+  'Nebula Edge':         { room:0.18, air:0.15, deep:0.40, mid:0.28, high:0.35, rain:0.00, thunder:0.00, breath:0.08, sub:0.28, pad:0.32, crackles:0.00, windgust:0.00 },
+  'Static Void':         { room:0.45, air:0.25, deep:0.20, mid:0.10, high:0.08, rain:0.00, thunder:0.00, breath:0.00, sub:0.30, pad:0.05, crackles:0.15, windgust:0.00 },
+  'Emerald Drift':       { room:0.20, air:0.12, deep:0.35, mid:0.30, high:0.25, rain:0.05, thunder:0.00, breath:0.15, sub:0.20, pad:0.30, crackles:0.00, windgust:0.00 },
+  'Last Transmission':   { room:0.30, air:0.18, deep:0.35, mid:0.20, high:0.22, rain:0.00, thunder:0.00, breath:0.05, sub:0.25, pad:0.15, crackles:0.05, windgust:0.00 },
+  'Glass Ocean':         { room:0.15, air:0.08, deep:0.30, mid:0.25, high:0.40, rain:0.00, thunder:0.00, breath:0.12, sub:0.18, pad:0.35, crackles:0.00, windgust:0.00 },
+  'Silent Orbit':        { room:0.12, air:0.05, deep:0.50, mid:0.22, high:0.15, rain:0.00, thunder:0.00, breath:0.08, sub:0.40, pad:0.25, crackles:0.00, windgust:0.00 },
+  'Molten Dreams':       { room:0.25, air:0.10, deep:0.40, mid:0.20, high:0.18, rain:0.00, thunder:0.05, breath:0.10, sub:0.35, pad:0.20, crackles:0.25, windgust:0.00 },
+  'Quantum Sleep':       { room:0.18, air:0.10, deep:0.35, mid:0.28, high:0.30, rain:0.00, thunder:0.00, breath:0.22, sub:0.22, pad:0.35, crackles:0.00, windgust:0.00 },
+  'Event Horizon':       { room:0.40, air:0.05, deep:0.65, mid:0.20, high:0.05, rain:0.00, thunder:0.00, breath:0.00, sub:0.60, pad:0.10, crackles:0.00, windgust:0.00 },
+  'forgott3n.VM':        { room:0.28, air:0.15, deep:0.42, mid:0.28, high:0.25, rain:0.00, thunder:0.00, breath:0.12, sub:0.30, pad:0.28, crackles:0.04, windgust:0.00 },
+};
+
+/* ───────────── Audio Helpers ───────────── */
+function makeBrownNoise(ctx, dur = 4) {
+  const len = ctx.sampleRate * dur;
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < len; i++) {
+    const w = (Math.random() * 2 - 1) * 0.05;
+    last = (last + w) * 0.998;
+    d[i] = last;
+  }
+  let peak = 0;
+  for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]));
+  for (let i = 0; i < len; i++) d[i] /= peak;
+  const src = ctx.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  return src;
+}
+
+function makePinkNoise(ctx, dur = 3) {
+  const len = ctx.sampleRate * dur;
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+  for (let i = 0; i < len; i++) {
+    const w = Math.random() * 2 - 1;
+    b0 = 0.99886*b0 + w*0.0555179;
+    b1 = 0.99332*b1 + w*0.0750759;
+    b2 = 0.96900*b2 + w*0.1538520;
+    b3 = 0.86650*b3 + w*0.3104856;
+    b4 = 0.55000*b4 + w*0.5329522;
+    b5 = -0.7616*b5 - w*0.0168980;
+    d[i] = (b0+b1+b2+b3+b4+b5+b6 + w*0.5362) * 0.11;
+    b6 = w * 0.115926;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf; src.loop = true;
+  return src;
+}
+
+function buildLayer(id, ctx, master) {
+  const gain = ctx.createGain();
+  gain.gain.value = 0;
+  gain.connect(master);
+  const state = { id, gain, nodes: [], muted: false, volume: 0.3, params: {} };
+
+  if (id === 'room' || id === 'air' || id === 'crackles' || id === 'windgust') {
+    const noise = id === 'crackles' || id === 'windgust' ? makePinkNoise(ctx) : makeBrownNoise(ctx);
+    const filter = ctx.createBiquadFilter();
+    if (id === 'room') { filter.type = 'lowpass'; filter.frequency.value = 180; }
+    else if (id === 'air') { filter.type = 'bandpass'; filter.frequency.value = 450; filter.Q.value = 0.7; }
+    else if (id === 'crackles') { filter.type = 'highpass'; filter.frequency.value = 2000; }
+    else { filter.type = 'bandpass'; filter.frequency.value = 800; filter.Q.value = 0.5; }
+    noise.connect(filter); filter.connect(gain); noise.start();
+    state.nodes = [noise, filter];
+    state.params.cut = filter;
+  }
+  else if (id === 'deep' || id === 'mid' || id === 'sub') {
+    const base = id === 'deep' ? 45 : id === 'sub' ? 32 : 90;
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    osc1.type = 'sine'; osc2.type = 'sine';
+    osc1.frequency.value = base;
+    osc2.frequency.value = base * 1.004;
+    const g1 = ctx.createGain(); g1.gain.value = 0.6;
+    const g2 = ctx.createGain(); g2.gain.value = 0.4;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = base * 5;
+    osc1.connect(g1); osc2.connect(g2);
+    g1.connect(lp); g2.connect(lp); lp.connect(gain);
+    osc1.start(); osc2.start();
+    state.nodes = [osc1, osc2, g1, g2, lp];
+    state.params.freq = [osc1.frequency, osc2.frequency];
+    state.params.base = base;
+  }
+  else if (id === 'high' || id === 'pad') {
+    const freqs = id === 'high' ? [110, 165, 220] : [70, 105, 140];
+    freqs.forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      const delay = ctx.createDelay(3);
+      const fb = ctx.createGain();
+      const g = ctx.createGain();
+      const lp = ctx.createBiquadFilter();
+      osc.type = 'sine'; osc.frequency.value = f;
+      delay.delayTime.value = 1.3 + i * 0.45;
+      fb.gain.value = 0.6;
+      g.gain.value = 0.11 - i * 0.025;
+      lp.type = 'lowpass'; lp.frequency.value = 900;
+      const lfo = ctx.createOscillator();
+      const lfoG = ctx.createGain();
+      lfo.frequency.value = 0.03 + Math.random() * 0.03;
+      lfoG.gain.value = 1.1;
+      lfo.connect(lfoG); lfoG.connect(osc.frequency);
+      osc.connect(g); g.connect(delay); delay.connect(lp);
+      lp.connect(fb); fb.connect(delay); lp.connect(gain);
+      osc.start(); lfo.start();
+      state.nodes.push(osc, delay, fb, g, lp, lfo, lfoG);
+    });
+  }
+  else if (id === 'rain') {
+    const noise = makePinkNoise(ctx, 2);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 1400;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 2800; bp.Q.value = 0.4;
+    noise.connect(hp); hp.connect(bp); bp.connect(gain);
+    noise.start();
+    state.nodes = [noise, hp, bp];
+  }
+  else if (id === 'thunder') {
+    state.params.next = 5 + Math.random() * 10;
+    state.params.timer = 0;
+  }
+  else if (id === 'breath') {
+    const tone = ctx.createOscillator();
+    tone.type = 'sine'; tone.frequency.value = 52;
+    const toneG = ctx.createGain();
+    toneG.gain.value = 0.12;
+    const lfo = ctx.createOscillator();
+    const lfoG = ctx.createGain();
+    lfo.frequency.value = 0.08;
+    lfoG.gain.value = 0.1;
+    lfo.connect(lfoG); lfoG.connect(toneG.gain);
+    tone.connect(toneG); toneG.connect(gain);
+    tone.start(); lfo.start();
+    state.nodes = [tone, toneG, lfo, lfoG];
+  }
+  return state;
+}
+
+function triggerThunder(layer) {
+  if (!audio.ctx || !layer.gain) return;
+  const ctx = audio.ctx;
+  const dur = 2.2 + Math.random() * 2.2;
+  const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / d.length;
+    const env = Math.sin(t * Math.PI) * Math.exp(-t * 2.1);
+    const w = (Math.random() * 2 - 1) * 0.4;
+    last = (last + w) * 0.97;
+    d[i] = last * env;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 160 + Math.random() * 140;
+  const g = ctx.createGain();
+  g.gain.value = 0.65 + Math.random() * 0.3;
+  src.connect(lp); lp.connect(g); g.connect(layer.gain);
+  src.start();
+}
+
+/* ───────────── Engine ───────────── */
+function initAudio() {
+  if (audio.ctx) return;
+  audio.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  audio.master = audio.ctx.createGain();
+  audio.master.gain.value = 0.72;
+  audio.analyser = audio.ctx.createAnalyser();
+  audio.analyser.fftSize = 256;
+  audio.master.connect(audio.analyser);
+  audio.analyser.connect(audio.ctx.destination);
+
+  LAYER_DEFS.forEach(def => {
+    audio.layers[def.id] = buildLayer(def.id, audio.ctx, audio.master);
+  });
+}
+
+function setLayerVolume(id, vol) {
+  const layer = audio.layers[id];
+  if (!layer) return;
+  layer.volume = vol;
+  const target = layer.muted ? 0 : vol;
+  if (layer.gain && audio.ctx) {
+    layer.gain.gain.setTargetAtTime(target, audio.ctx.currentTime, 0.08);
+  }
+}
+
+function toggleMute(id) {
+  const layer = audio.layers[id];
+  if (!layer) return;
+  layer.muted = !layer.muted;
+  setLayerVolume(id, layer.volume);
+  updateLayerUI(id);
+}
+
+function startEngine() {
+  initAudio();
+  if (audio.ctx.state === 'suspended') audio.ctx.resume();
+  audio.running = true;
+  document.getElementById('playBtn').textContent = '■ STOP';
+  document.getElementById('playBtn').classList.add('active');
+  setStatus('Running');
+  LAYER_DEFS.forEach(def => {
+    const el = document.querySelector(`[data-layer="${def.id}"] input.vol`);
+    if (el) setLayerVolume(def.id, el.value / 100);
+  });
+  requestAnimationFrame(vizLoop);
+  requestAnimationFrame(thunderLoop);
+}
+
+function stopEngine() {
+  audio.running = false;
+  if (audio.master && audio.ctx) {
+    audio.master.gain.setTargetAtTime(0, audio.ctx.currentTime, 0.4);
+  }
+  document.getElementById('playBtn').textContent = '▶ PLAY';
+  document.getElementById('playBtn').classList.remove('active');
+  setStatus('Stopped');
+  setTimeout(() => {
+    if (audio.ctx) {
+      audio.ctx.close().catch(()=>{});
+      audio.ctx = null;
+      audio.layers = {};
+    }
+  }, 1100);
+}
+
+function thunderLoop() {
+  if (!audio.running) return;
+  const layer = audio.layers.thunder;
+  if (layer && !layer.muted && layer.volume > 0.04) {
+    layer.params.timer = (layer.params.timer || 0) + 0.016;
+    const freq = audio.toggles.thunderFreq ? 3.5 : 8;
+    if (layer.params.timer > (layer.params.next || freq)) {
+      triggerThunder(layer);
+      layer.params.timer = 0;
+      layer.params.next = (audio.toggles.thunderFreq ? 2.5 : 5) + Math.random() * (audio.toggles.thunderFreq ? 6 : 12);
+    }
+  }
+  requestAnimationFrame(thunderLoop);
+}
+
+/* ───────────── Visualizer ───────────── */
+const viz = document.getElementById('viz');
+const vctx = viz.getContext('2d');
+function resizeViz() {
+  viz.width = viz.clientWidth * devicePixelRatio;
+  viz.height = viz.clientHeight * devicePixelRatio;
+}
+window.addEventListener('resize', resizeViz);
+resizeViz();
+
+function vizLoop() {
+  if (!audio.running || !audio.analyser) return;
+  const buf = new Uint8Array(audio.analyser.frequencyBinCount);
+  audio.analyser.getByteFrequencyData(buf);
+  const w = viz.width, h = viz.height;
+  vctx.fillStyle = 'rgba(2,6,16,0.3)';
+  vctx.fillRect(0, 0, w, h);
+  const bars = 52;
+  const step = Math.floor(buf.length / bars);
+  const barW = w / bars;
+  for (let i = 0; i < bars; i++) {
+    let sum = 0;
+    for (let j = 0; j < step; j++) sum += buf[i*step + j];
+    const v = sum / step / 255;
+    const barH = v * h * 0.88;
+    const g = Math.floor(30 + v * 180);
+    const b = Math.floor(60 + v * 160);
+    vctx.fillStyle = `rgba(${g*0.3},${g},${b},0.85)`;
+    vctx.fillRect(i * barW + 1, h - barH, barW - 2, barH);
+  }
+  requestAnimationFrame(vizLoop);
+}
+
+/* ───────────── Particles ───────────── */
+const pCanvas = document.getElementById('particles');
+const pctx = pCanvas.getContext('2d');
+let particles = [];
+function resizeParticles() {
+  pCanvas.width = innerWidth;
+  pCanvas.height = innerHeight;
+  particles = Array.from({ length: 110 }, () => ({
+    x: Math.random() * pCanvas.width,
+    y: Math.random() * pCanvas.height,
+    r: Math.random() * 1.4 + 0.3,
+    s: Math.random() * 0.25 + 0.05,
+    a: Math.random() * 0.4 + 0.1
+  }));
+}
+window.addEventListener('resize', resizeParticles);
+resizeParticles();
+
+function particleLoop() {
+  pctx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+  particles.forEach(p => {
+    p.y += p.s;
+    if (p.y > pCanvas.height) { p.y = -5; p.x = Math.random() * pCanvas.width; }
+    pctx.beginPath();
+    pctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    pctx.fillStyle = `rgba(180, 220, 255, ${p.a})`;
+    pctx.fill();
+  });
+  requestAnimationFrame(particleLoop);
+}
+particleLoop();
+
+/* ───────────── UI ───────────── */
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+
+function buildUI() {
+  // Layers
+  const container = document.getElementById('layers');
+  container.innerHTML = '';
+  LAYER_DEFS.forEach(def => {
+    const card = document.createElement('div');
+    card.className = 'layer';
+    card.dataset.layer = def.id;
+    card.innerHTML = `
+      <div class="layer-header">
+        <span class="layer-name">${def.name}</span>
+        <button class="mute-btn" data-mute="${def.id}">M</button>
+      </div>
+      <div class="ctrl-row">
+        <label>VOL</label>
+        <input type="range" class="vol" min="0" max="100" value="25" data-id="${def.id}">
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  // Toggles
+  const tpanel = document.getElementById('toggles');
+  tpanel.innerHTML = '';
+  TOGGLE_DEFS.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'toggle';
+    el.dataset.toggle = t.id;
+    el.innerHTML = `<div class="dot"></div>${t.label}`;
+    el.onclick = () => {
+      audio.toggles[t.id] = !audio.toggles[t.id];
+      el.classList.toggle('on', !!audio.toggles[t.id]);
+    };
+    tpanel.appendChild(el);
+  });
+
+  // Presets
+  const plist = document.getElementById('presetList');
+  plist.innerHTML = '';
+  Object.keys(PRESETS).forEach(name => {
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.onclick = () => applyPreset(name);
+    plist.appendChild(b);
+  });
+
+  // Events
+  document.querySelectorAll('input.vol').forEach(el => {
+    el.oninput = () => {
+      if (audio.running) setLayerVolume(el.dataset.id, el.value / 100);
+    };
+  });
+  document.querySelectorAll('[data-mute]').forEach(btn => {
+    btn.onclick = () => toggleMute(btn.dataset.mute);
+  });
+}
+
+function updateLayerUI(id) {
+  const card = document.querySelector(`[data-layer="${id}"]`);
+  const layer = audio.layers[id];
+  if (!card || !layer) return;
+  card.classList.toggle('muted', layer.muted);
+  const btn = card.querySelector('.mute-btn');
+  if (btn) btn.textContent = layer.muted ? '●' : 'M';
+}
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+  LAYER_DEFS.forEach(def => {
+    const volEl = document.querySelector(`[data-layer="${def.id}"] input.vol`);
+    if (volEl && p[def.id] !== undefined) {
+      volEl.value = Math.round(p[def.id] * 100);
+      if (audio.running) setLayerVolume(def.id, p[def.id]);
+    }
+  });
+  setStatus(`Preset: ${name}`);
+}
+
+function randomize() {
+  LAYER_DEFS.forEach(def => {
+    const vol = Math.random() < 0.28 ? 0 : Math.random() * 0.65;
+    const el = document.querySelector(`[data-layer="${def.id}"] input.vol`);
+    if (el) {
+      el.value = Math.round(vol * 100);
+      if (audio.running) setLayerVolume(def.id, vol);
+    }
+  });
+  // Random toggles
+  TOGGLE_DEFS.forEach(t => {
+    const on = Math.random() < 0.22;
+    audio.toggles[t.id] = on;
+    const el = document.querySelector(`[data-toggle="${t.id}"]`);
+    if (el) el.classList.toggle('on', on);
+  });
+  setStatus('Randomized');
+}
+
+/* ───────────── IndexedDB Tracks ───────────── */
+let db;
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('AmbienceStudioDB', 1);
+    req.onupgradeneeded = e => {
+      const database = e.target.result;
+      if (!database.objectStoreNames.contains('tracks')) {
+        database.createObjectStore('tracks', { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror = e => reject(e);
+  });
+}
+
+function saveTrack() {
+  const name = prompt('Track name:', `Track ${new Date().toLocaleTimeString()}`);
+  if (!name) return;
+
+  const data = { layers: {}, toggles: { ...audio.toggles }, name, created: Date.now() };
+  LAYER_DEFS.forEach(def => {
+    const el = document.querySelector(`[data-layer="${def.id}"] input.vol`);
+    if (el) data.layers[def.id] = el.value / 100;
+  });
+
+  const tx = db.transaction('tracks', 'readwrite');
+  tx.objectStore('tracks').add(data);
+  tx.oncomplete = () => {
+    setStatus(`Saved: ${name}`);
+    renderTracks();
+  };
+}
+
+function loadTrack(track) {
+  LAYER_DEFS.forEach(def => {
+    const vol = track.layers[def.id] ?? 0;
+    const el = document.querySelector(`[data-layer="${def.id}"] input.vol`);
+    if (el) {
+      el.value = Math.round(vol * 100);
+      if (audio.running) setLayerVolume(def.id, vol);
+    }
+  });
+  TOGGLE_DEFS.forEach(t => {
+    const on = !!(track.toggles && track.toggles[t.id]);
+    audio.toggles[t.id] = on;
+    const el = document.querySelector(`[data-toggle="${t.id}"]`);
+    if (el) el.classList.toggle('on', on);
+  });
+  setStatus(`Loaded: ${track.name}`);
+}
+
+function deleteTrack(id) {
+  const tx = db.transaction('tracks', 'readwrite');
+  tx.objectStore('tracks').delete(id);
+  tx.oncomplete = () => renderTracks();
+}
+
+function renderTracks() {
+  const list = document.getElementById('trackList');
+  const tx = db.transaction('tracks', 'readonly');
+  const req = tx.objectStore('tracks').getAll();
+  req.onsuccess = () => {
+    const tracks = req.result.sort((a,b) => b.created - a.created);
+    if (!tracks.length) {
+      list.innerHTML = `<div style="padding:12px;color:var(--muted);font-size:11px">No saved tracks yet</div>`;
+      return;
+    }
+    list.innerHTML = '';
+    tracks.forEach(t => {
+      const btn = document.createElement('button');
+      btn.innerHTML = `${t.name} <span style="float:right;opacity:0.5;font-size:9px">✕</span>`;
+      btn.onclick = e => {
+        if (e.target.tagName === 'SPAN') deleteTrack(t.id);
+        else loadTrack(t);
+      };
+      list.appendChild(btn);
+    });
+  };
+}
+
+/* ───────────── Events ───────────── */
+document.getElementById('playBtn').onclick = () => audio.running ? stopEngine() : startEngine();
+document.getElementById('randBtn').onclick = randomize;
+document.getElementById('saveBtn').onclick = saveTrack;
+
+document.getElementById('masterVol').oninput = e => {
+  if (audio.master && audio.ctx) {
+    audio.master.gain.setTargetAtTime(e.target.value / 100, audio.ctx.currentTime, 0.05);
+  }
+};
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); document.getElementById('playBtn').click(); }
+  if (e.key.toLowerCase() === 'r') randomize();
+  if (e.key.toLowerCase() === 's') saveTrack();
+});
+
+/* ───────────── Boot ───────────── */
+buildUI();
+openDB().then(() => {
+  renderTracks();
+  applyPreset('Deep Space');
+  setStatus('Ready — Space to play');
+});
+</script>
+</body>
+</html>
